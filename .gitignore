@@ -1,0 +1,4 @@
+*.bak-*
+session-*.md
+*.db
+*.sqlite

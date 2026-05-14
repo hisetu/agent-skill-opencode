@@ -6,17 +6,17 @@ Remove compaction messages from an OpenCode session to restore full conversation
 Compaction causes AI agents to "forget" earlier context by replacing it with summaries.
 
 Usage:
-  python3 clean_compaction.py <session_id> [--dry-run] [--backup]
+  python3 clean_compaction.py <session_id> [--dry-run] [--apply] [--backup]
 
 Examples:
-  # Preview what would be deleted (safe)
+  # Preview what would be deleted (default, safe)
+  python3 clean_compaction.py ses_abc123
+
+  # Explicit dry run
   python3 clean_compaction.py ses_abc123 --dry-run
 
-  # Backup DB then clean
-  python3 clean_compaction.py ses_abc123 --backup
-
-  # Clean directly (DB backup recommended)
-  python3 clean_compaction.py ses_abc123
+  # Backup DB then apply deletion
+  python3 clean_compaction.py ses_abc123 --backup --apply
 """
 
 import argparse
@@ -202,6 +202,11 @@ def main():
         help="Preview what would be deleted without making changes",
     )
     parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually delete data. If omitted, the script runs in dry-run mode by default",
+    )
+    parser.add_argument(
         "--backup",
         action="store_true",
         help="Create a database backup before cleaning",
@@ -209,15 +214,16 @@ def main():
     parser.add_argument(
         "--mode",
         choices=["compaction-only", "compaction-and-after"],
-        default="compaction-and-after",
-        help="'compaction-only': delete only compaction messages. "
-             "'compaction-and-after': delete compaction and all messages after first compaction (default)",
+        default="compaction-only",
+        help="'compaction-only': delete only compaction messages (default). "
+             "'compaction-and-after': delete compaction and all messages after first compaction",
     )
     args = parser.parse_args()
+    dry_run = args.dry_run or not args.apply
 
     db_path = get_db_path()
 
-    if args.backup and not args.dry_run:
+    if args.backup and not dry_run:
         backup_db()
 
     conn = sqlite3.connect(db_path)
@@ -292,8 +298,9 @@ def main():
         print(f"\nMessages to delete (compaction only + paired empty user msgs): {len(msg_ids)}")
         print(f"Parts to delete: {parts_count}")
 
-    if args.dry_run:
+    if dry_run:
         print("\n[DRY RUN] No changes made.")
+        print("Use --apply to perform deletion.")
         if args.mode == "compaction-and-after":
             print("\nMessages that would be deleted:")
             for m in to_delete:
